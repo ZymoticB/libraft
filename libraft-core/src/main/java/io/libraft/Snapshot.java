@@ -28,40 +28,28 @@
 
 package io.libraft;
 
-import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
+ * Implemented by classes that represent aggregate committed state at a given log index.
  */
-public interface RaftListener {
+public interface Snapshot extends Committed {
 
     /**
-     * Indicates that a leadership change has occurred.
+     * Get the index of the last committed log entry contained in the snapshot.
      *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
+     * @return index > 0 in the Raft log of the last committed entry contained in the snapshot
      */
-    void onLeadershipChange(@Nullable String leader);
-
-    void createSnapshot(SnapshotRequest snapshotRequest);
-
-    void applySnapshot(Snapshot snapshot);
+    long getIndex();
 
     /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
+     * Get the {@code InputStream} from which the snapshot can be read.
+     * It is the caller's responsibility to close this {@code InputStream} once
+     * it has completed reading from it.
      *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
+     * @return a valid {@code InputStream} from which a snapshot can be read
+     * @throws IOException if the {@code InputStream} from which to read the snapshot cannot be created
      */
-    void applyCommand(CommittedCommand committedCommand);
+    InputStream getSnapshotInputStream() throws IOException;
 }

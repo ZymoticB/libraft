@@ -26,42 +26,68 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.libraft;
+package io.libraft.kayvee.store;
+
+import com.google.common.base.Objects;
+import io.libraft.Command;
+import io.libraft.CommittedCommand;
 
 import javax.annotation.Nullable;
 
-/**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
- */
-public interface RaftListener {
+final class TestCommittedCommand implements CommittedCommand {
+
+    private final long index;
+    private final Command command;
 
     /**
-     * Indicates that a leadership change has occurred.
+     * Constructor.
      *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
-     */
-    void onLeadershipChange(@Nullable String leader);
-
-    void createSnapshot(SnapshotRequest snapshotRequest);
-
-    void applySnapshot(Snapshot snapshot);
-
-    /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
+     * @param index index > 0 in the Raft log of the committed {@code Command}
+     * @param command the committed {@code Command} instance
      *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
+     * @see Command
      */
-    void applyCommand(CommittedCommand committedCommand);
+    TestCommittedCommand(long index, Command command) {
+        this.index = index;
+        this.command = command;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.LOGENTRY;
+    }
+
+    @Override
+    public long getIndex() {
+        return index;
+    }
+
+    @Override
+    public Command getCommand() {
+        return command;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        TestCommittedCommand other = (TestCommittedCommand) o;
+
+        return index == other.index && command.equals(other.command);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(index, command);
+    }
+
+    @Override
+    public String toString() {
+        return Objects
+                .toStringHelper(this)
+                .add("index", index)
+                .add("command", command)
+                .toString();
+    }
 }

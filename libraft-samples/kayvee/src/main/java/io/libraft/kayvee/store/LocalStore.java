@@ -28,12 +28,20 @@
 
 package io.libraft.kayvee.store;
 
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.io.Closeables;
 import io.libraft.kayvee.api.KeyValue;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -53,7 +61,11 @@ public class LocalStore {
 
     private final Map<String, String> entries = Maps.newHashMap();
 
-    private long lastAppliedCommandIndex = 0;
+    private long lastAppliedIndex = 0;
+
+    //
+    // store operations
+    //
 
     /**
      * Get the log index of the last applied command.
@@ -62,34 +74,34 @@ public class LocalStore {
      *
      * @return index >=0 of the last applied command
      */
-    long getLastAppliedCommandIndex() {
-        return lastAppliedCommandIndex;
+    long getLastAppliedIndex() {
+        return lastAppliedIndex;
     }
 
     //
-    // IMPORTANT: always update lastAppliedCommandIndex first for the operations below
+    // IMPORTANT: always update lastAppliedIndex first for the operations below
     //
 
     /**
      * A noop operation. This call does not affect the
      * key-value state, but does update the last applied command index.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      */
-    synchronized void nop(final long commandIndex) {
-        updateLastAppliedCommandIndex(commandIndex);
+    synchronized void nop(final long index) {
+        updateLastAppliedIndex(index);
     }
 
     /**
      * Get the value for a key.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      * @param key non-null (possibly empty) key for which the value should be retrieved
      * @return a {@code KeyValue} instance containing the most up-to-date {@code key=>value} pair for {@code key}
      * @throws KayVeeException if {@code key} does not exist
      */
-    synchronized KeyValue get(final long commandIndex, final String key) throws KayVeeException {
-        updateLastAppliedCommandIndex(commandIndex);
+    synchronized KeyValue get(final long index, final String key) throws KayVeeException {
+        updateLastAppliedIndex(index);
 
         String value = entries.get(key);
 
@@ -103,11 +115,11 @@ public class LocalStore {
     /**
      * Get all (key, value) pairs.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      * @return a <strong>copy</strong> of the most up-to-date {@code key=>value} pairs for all keys
      */
-    synchronized Collection<KeyValue> getAll(final long commandIndex) {
-        updateLastAppliedCommandIndex(commandIndex);
+    synchronized Collection<KeyValue> getAll(final long index) {
+        updateLastAppliedIndex(index);
 
         Collection<KeyValue> copiedEntries = Lists.newArrayListWithCapacity(entries.size());
         for (Map.Entry<String, String> entry : entries.entrySet()) {
@@ -120,13 +132,13 @@ public class LocalStore {
     /**
      * Set a key to a value.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      * @param key non-null (possibly empty) key for which the value should be set
      * @param value non-null, non-empty value for this key
      * @return a {@code KeyValue} instance containing the most up-to-date {@code key=>value} pair for {@code key}
      */
-    synchronized KeyValue set(final long commandIndex, final String key, final String value) {
-        updateLastAppliedCommandIndex(commandIndex);
+    synchronized KeyValue set(final long index, final String key, final String value) {
+        updateLastAppliedIndex(index);
 
         entries.put(key, value);
 
@@ -136,7 +148,7 @@ public class LocalStore {
     /**
      * Do a compare-and-set (CAS), aka. test-and-set, operation for key.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      * @param key non-null (possibly empty) key for which the value should be set
      * @param expectedValue existing value associated with {@code key}.
      *                      If {@code expectedValue} is null {@code LocalStore} <strong>should not</strong>
@@ -151,17 +163,17 @@ public class LocalStore {
      * a new key-value mapping should be created), but a {@code key=>value} pair already exists
      */
     synchronized @Nullable KeyValue compareAndSet(
-            final long commandIndex,
+            final long index,
             final String key,
             final @Nullable String expectedValue,
             final @Nullable String newValue)
             throws KeyNotFoundException, ValueMismatchException, KeyAlreadyExistsException {
         if (expectedValue == null && newValue == null) {
-            // while I _could_ update the lastAppliedCommandIndex here, calling code should never call us with these arguments
-            throw new IllegalArgumentException(String.format("both expectedValue and newValue null for %s (commandIndex:%s)", key, commandIndex));
+            // while I _could_ update the lastAppliedIndex here, calling code should never call us with these arguments
+            throw new IllegalArgumentException(String.format("both expectedValue and newValue null for %s (index:%s)", key, index));
         }
 
-        updateLastAppliedCommandIndex(commandIndex);
+        updateLastAppliedIndex(index);
 
         String existingValue = entries.get(key);
 
@@ -209,25 +221,61 @@ public class LocalStore {
     /**
      * Delete the value for a key. This operation is a noop if the key does not exist.
      *
-     * @param commandIndex log index >= 0 associated with this command
+     * @param index log index >= 0 associated with this command
      * @param key non-null (possibly empty) key for which the value should be deleted
      */
-    synchronized void delete(final long commandIndex, final String key) {
-        updateLastAppliedCommandIndex(commandIndex);
+    synchronized void delete(final long index, final String key) {
+        updateLastAppliedIndex(index);
 
         entries.remove(key);
     }
 
-    private void updateLastAppliedCommandIndex(long commandIndex) {
-        checkArgument(commandIndex > 0, "commandIndex must be positive: given:%s", commandIndex);
-        checkArgument(commandIndex > lastAppliedCommandIndex, "commandIndex must be monotonic: given:%s", commandIndex);
+    private void updateLastAppliedIndex(long index) {
+        checkArgument(index > 0, "index must be positive: given:%s", index);
+        checkArgument(index > lastAppliedIndex, "index must be monotonic: given:%s", index);
 
-        lastAppliedCommandIndex = commandIndex;
+        lastAppliedIndex = index;
+    }
+
+    //
+    // state {de}serialization
+    // see: http://jackson-users.ning.com/forum/topics/appending-pojos-to-a-json-file
+    //
+
+    synchronized long dumpSnapshotTo(OutputStream snapshotOutputStream) throws IOException {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                mapper.writeValue(snapshotOutputStream, new KeyValue(entry.getKey(), entry.getValue()));
+            }
+
+            return lastAppliedIndex;
+        } finally {
+            Closeables.close(snapshotOutputStream, true);
+        }
+    }
+
+    synchronized void loadSnapshotFrom(long index, InputStream snapshotInputStream) throws IOException {
+        try {
+            entries.clear();
+
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectReader reader = mapper.reader(KeyValue.class);
+            MappingIterator<KeyValue> it = reader.readValues(snapshotInputStream);
+            while(it.hasNext()) {
+                KeyValue keyValue = it.next();
+                entries.put(keyValue.getKey(), keyValue.getValue());
+            }
+
+            lastAppliedIndex = index;
+        } finally {
+            Closeables.close(snapshotInputStream, true);
+        }
     }
 
     //
     // the following commands are to be used within unit tests only
-    // they set the underlying state, do not update lastAppliedCommandIndex and do not perform any verification
+    // they set the underlying state, do not update lastAppliedIndex and do not perform any verification
     //
 
     /**
@@ -237,10 +285,10 @@ public class LocalStore {
      * reasons only!</strong> It should <strong>never</strong>
      * be called in a non-test context!
      *
-     * @param commandIndex log index >= 0 for the last command applied
+     * @param index log index >= 0 for the last command applied
      */
-    void setLastAppliedCommandIndexForUnitTestsOnly(long commandIndex) {
-        updateLastAppliedCommandIndex(commandIndex);
+    void setLastAppliedIndexForUnitTestsOnly(long index) {
+        updateLastAppliedIndex(index);
     }
 
     /**
@@ -269,5 +317,15 @@ public class LocalStore {
      */
     @Nullable String getKeyValueForUnitTestsOnly(String key) {
         return entries.get(key);
+    }
+
+    Collection<KeyValue> getAllForUnitTestsOnly() {
+        List<KeyValue> copiedEntries = Lists.newArrayListWithCapacity(entries.size());
+
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            copiedEntries.add(new KeyValue(entry.getKey(), entry.getValue()));
+        }
+
+        return copiedEntries;
     }
 }

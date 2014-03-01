@@ -38,6 +38,8 @@ import java.util.concurrent.TimeUnit;
  */
 public abstract class RaftConstants {
 
+    private static final long TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
     // MIN_ELECTION_TIMEOUT and ADDITIONAL_ELECTION_TIMEOUT_RANGE are chosen so that:
     // - The max election timeout (MAX_ELECTION_TIMEOUT) is 300 ms
     // - Even if the following sequence of events occur:
@@ -104,6 +106,12 @@ public abstract class RaftConstants {
      * A new interval is started immediately after sending the messages generated in the previous one.
      */
     public static final int HEARTBEAT_INTERVAL = 15;
+
+    public static final int SNAPSHOTS_DISABLED = -1;
+
+    public static final int MIN_ENTRIES_TO_SNAPSHOT = SNAPSHOTS_DISABLED;
+
+    public static final long SNAPSHOT_CHECK_INTERVAL = TWELVE_HOURS;
 
     /**
      * {@link java.util.concurrent.TimeUnit} in which all

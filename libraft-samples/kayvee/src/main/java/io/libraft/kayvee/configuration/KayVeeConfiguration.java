@@ -32,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import com.yammer.dropwizard.config.Configuration;
 import io.libraft.agent.configuration.RaftDatabaseConfiguration;
+import io.libraft.agent.configuration.RaftSnapshotsConfiguration;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -49,12 +50,18 @@ import javax.validation.constraints.NotNull;
  * </ul>
  * See the KayVee README.md for more on the KayVee configuration.
  */
+@SuppressWarnings("unused")
 public class KayVeeConfiguration extends Configuration {
 
     @Valid
     @NotNull
     @JsonProperty("raftDatabase")
     private RaftDatabaseConfiguration raftDatabaseConfiguration;
+
+    @Valid
+    @NotNull
+    @JsonProperty("snapshots")
+    private RaftSnapshotsConfiguration snapshotsConfiguration = new RaftSnapshotsConfiguration(); // disable snapshots unless overridden
 
     @Valid
     @NotNull
@@ -65,16 +72,22 @@ public class KayVeeConfiguration extends Configuration {
         return raftDatabaseConfiguration;
     }
 
-    @SuppressWarnings("unused")
     public void setRaftDatabaseConfiguration(RaftDatabaseConfiguration raftDatabaseConfiguration) {
         this.raftDatabaseConfiguration = raftDatabaseConfiguration;
+    }
+
+    public RaftSnapshotsConfiguration getSnapshotsConfiguration() {
+        return snapshotsConfiguration;
+    }
+
+    public void setSnapshotsConfiguration(RaftSnapshotsConfiguration snapshotsConfiguration) {
+        this.snapshotsConfiguration = snapshotsConfiguration;
     }
 
     public ClusterConfiguration getClusterConfiguration() {
         return clusterConfiguration;
     }
 
-    @SuppressWarnings("unused")
     public void setClusterConfiguration(ClusterConfiguration clusterConfiguration) {
         this.clusterConfiguration = clusterConfiguration;
     }

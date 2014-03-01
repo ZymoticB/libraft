@@ -1,17 +1,14 @@
 {
-    "rpcTimeout": 30,
-    "minElectionTimeout": 180,
-    "additionalElectionTimeoutRange": 120,
-    "heartbeatInterval": 15,
-    "connectTimeout": 5000,
-    "minReconnectInterval": 10000,
-    "additionalReconnectIntervalRange": 1000,
-
     "database": {
         "driverClass": "org.h2.Driver",
         "url": "jdbc:h2:test_db",
-        "user": "test",
-        "password": "test"
+        "user": "test"
+    },
+
+    "snapshots" : {
+        "minEntriesToSnapshot": -1,
+        "snapshotsDirectory": "snapshots",
+        "snapshotCheckInterval": 10000
     },
 
     "cluster": {
@@ -19,7 +16,7 @@
         "members": [
             {
                 "id": "S_00",
-                "endpoint": ":9990"
+                "endpoint": "192.168.1.100:9990"
             },
             {
                 "id": "S_01",

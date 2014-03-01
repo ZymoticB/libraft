@@ -29,10 +29,14 @@
 package io.libraft.kayvee.store;
 
 import io.libraft.kayvee.api.KeyValue;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Collection;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -57,39 +61,39 @@ public final class LocalStoreTest {
     }
 
     @Test
-    public void shouldReturn0AsLastAppliedCommandIndexAfterInitialization() throws Exception {
-        long lastAppliedCommandIndex = localStore.getLastAppliedCommandIndex();
-        assertThat(lastAppliedCommandIndex, equalTo(0L));
+    public void shouldReturn0AsLastAppliedIndexAfterInitialization() throws Exception {
+        long lastAppliedIndex = localStore.getLastAppliedIndex();
+        assertThat(lastAppliedIndex, equalTo(0L));
     }
 
     @Test
-    public void shouldReturnCorrectLastAppliedCommandIndex() throws Exception {
-        final long commandIndex = 31;
+    public void shouldReturnCorrectLastAppliedIndex() throws Exception {
+        final long index = 31;
 
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(commandIndex);
+        localStore.setLastAppliedIndexForUnitTestsOnly(index);
 
-        long lastAppliedCommandIndex = localStore.getLastAppliedCommandIndex();
-        assertThat(lastAppliedCommandIndex, equalTo(commandIndex));
+        long lastAppliedIndex = localStore.getLastAppliedIndex();
+        assertThat(lastAppliedIndex, equalTo(index));
     }
 
     @Test
-    public void shouldUpdateCommandIndexForANopCommand() throws Exception {
-        final long originalCommandIndex = 123;
+    public void shouldUpdateIndexForANopCommand() throws Exception {
+        final long originalIndex = 123;
 
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(originalCommandIndex);
+        localStore.setLastAppliedIndexForUnitTestsOnly(originalIndex);
 
-        localStore.nop(originalCommandIndex + 1);
+        localStore.nop(originalIndex + 1);
 
-        long updatedCommandIndex = localStore.getLastAppliedCommandIndex();
-        assertThat(updatedCommandIndex, equalTo(originalCommandIndex + 1));
+        long updatedIndex = localStore.getLastAppliedIndex();
+        assertThat(updatedIndex, equalTo(originalIndex + 1));
     }
 
     @Test
     public void shouldThrowKeyNotFoundExceptionIfKeyDoesNotExist()  {
-        final int newCommandIndex = 1;
+        final int newIndex = 1;
         KayVeeException thrownException = null;
         try {
-            localStore.get(newCommandIndex, "FAKE_KEY");
+            localStore.get(newIndex, "FAKE_KEY");
         } catch (KayVeeException e) {
             thrownException = e;
         }
@@ -99,7 +103,7 @@ public final class LocalStoreTest {
         assertThat(((KeyNotFoundException) thrownException).getKey(), equalTo("FAKE_KEY"));
 
         assertThatLocalStoreHasKeyValue("FAKE_KEY", null);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
@@ -108,26 +112,26 @@ public final class LocalStoreTest {
         localStore.setKeyValueForUnitTestsOnly(KEY, NEW_VALUE);
 
         // get the key/value
-        final int newCommandIndex = 27;
-        KeyValue keyValue = localStore.get(newCommandIndex, KEY);
+        final int newIndex = 27;
+        KeyValue keyValue = localStore.get(newIndex, KEY);
 
         assertThat(keyValue, notNullValue());
         assertThat(keyValue.getKey(), equalTo(KEY));
         assertThat(keyValue.getValue(), equalTo(NEW_VALUE));
 
         assertThatLocalStoreHasKeyValue(KEY, NEW_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
     public void shouldReturnEmptyCollectionIfGetAllIsCalledAndThereAreNoEntriesInDB() throws Exception {
-        final long commandIndex = 81;
-        Collection<KeyValue> all = localStore.getAll(commandIndex);
+        final long index = 81;
+        Collection<KeyValue> all = localStore.getAll(index);
 
         all = checkNotNull(all);
         assertThat(all, hasSize(0));
 
-        assertThatLastAppliedCommandIndexHasValue(commandIndex);
+        assertThatLastAppliedIndexHasValue(index);
     }
 
     @Test
@@ -145,22 +149,22 @@ public final class LocalStoreTest {
 
         }
 
-        final long commandIndex = 77;
-        Collection<KeyValue> all = localStore.getAll(commandIndex);
+        final long index = 77;
+        Collection<KeyValue> all = localStore.getAll(index);
 
         all = checkNotNull(all);
         assertThat(all, containsInAnyOrder(keyValues));
 
-        assertThatLastAppliedCommandIndexHasValue(commandIndex);
+        assertThatLastAppliedIndexHasValue(index);
     }
 
     @Test
     public void shouldCreateKeyIfItDoesNotExistWhenSetIsCalled() {
-        final long commandIndex = 172;
-        localStore.set(commandIndex, KEY, EXPECTED_VALUE);
+        final long index = 172;
+        localStore.set(index, KEY, EXPECTED_VALUE);
 
         assertThatLocalStoreHasKeyValue(KEY, EXPECTED_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(commandIndex);
+        assertThatLastAppliedIndexHasValue(index);
     }
 
     @Test
@@ -170,21 +174,21 @@ public final class LocalStoreTest {
         assertThatLocalStoreHasKeyValue(KEY, EXPECTED_VALUE);
 
         // now, update to the new value
-        final long commandIndex = 99;
-        localStore.set(commandIndex, KEY, NEW_VALUE);
+        final long index = 99;
+        localStore.set(index, KEY, NEW_VALUE);
 
         assertThatLocalStoreHasKeyValue(KEY, NEW_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(commandIndex);
+        assertThatLastAppliedIndexHasValue(index);
     }
 
     @Test
-    public void shouldThrowIfGivenCommandIndexIsZero() {
-        final long originalCommandIndex = 17;
+    public void shouldThrowIfGivenIndexIsZero() {
+        final long originalIndex = 17;
 
-        // set the original commandIndex
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(originalCommandIndex);
+        // set the original index
+        localStore.setLastAppliedIndexForUnitTestsOnly(originalIndex);
 
-        // now, try to set a commandIndex with '0'
+        // now, try to set a index with '0'
         IllegalArgumentException setException = null;
         try {
             localStore.set(0, KEY, EXPECTED_VALUE);
@@ -194,17 +198,17 @@ public final class LocalStoreTest {
         assertThat(setException, notNullValue());
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(originalCommandIndex);
+        assertThatLastAppliedIndexHasValue(originalIndex);
     }
 
     @Test
-    public void shouldThrowIfGivenCommandIndexIsNegative() {
-        final long originalCommandIndex = 27;
+    public void shouldThrowIfGivenIndexIsNegative() {
+        final long originalIndex = 27;
 
-        // set the original commandIndex
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(originalCommandIndex);
+        // set the original index
+        localStore.setLastAppliedIndexForUnitTestsOnly(originalIndex);
 
-        // now, try to set a negative commandIndex
+        // now, try to set a negative index
         IllegalArgumentException setException = null;
         try {
             localStore.set(-17, KEY, EXPECTED_VALUE);
@@ -214,17 +218,17 @@ public final class LocalStoreTest {
         assertThat(setException, notNullValue());
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(originalCommandIndex);
+        assertThatLastAppliedIndexHasValue(originalIndex);
     }
 
     @Test
-    public void shouldThrowIfGivenCommandIndexIsNotMonotonicallyIncreasing() {
-        final long originalCommandIndex = 37;
+    public void shouldThrowIfGivenIndexIsNotMonotonicallyIncreasing() {
+        final long originalIndex = 37;
 
-        // set the original commandIndex
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(originalCommandIndex);
+        // set the original index
+        localStore.setLastAppliedIndexForUnitTestsOnly(originalIndex);
 
-        // now, try to set a commandIndex with one less than the original command index
+        // now, try to set a index with one less than the original command index
         IllegalArgumentException setException = null;
         try {
             localStore.set(36, KEY, EXPECTED_VALUE);
@@ -234,14 +238,14 @@ public final class LocalStoreTest {
         assertThat(setException, notNullValue());
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(originalCommandIndex);
+        assertThatLastAppliedIndexHasValue(originalIndex);
     }
 
     @Test
     public void shouldCreateKeyIfCASIsAttemptedForKeyThatDoesNotExist() throws Exception {
         // do the CAS
-        final long newCommandIndex = 66;
-        KeyValue keyValue = localStore.compareAndSet(newCommandIndex, KEY, null, NEW_VALUE);
+        final long newIndex = 66;
+        KeyValue keyValue = localStore.compareAndSet(newIndex, KEY, null, NEW_VALUE);
         keyValue = checkNotNull(keyValue);
 
         assertThat(keyValue.getKey(), equalTo(KEY));
@@ -249,7 +253,7 @@ public final class LocalStoreTest {
 
         // check that the store and command index were updated
         assertThatLocalStoreHasKeyValue(KEY, NEW_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
@@ -258,15 +262,15 @@ public final class LocalStoreTest {
         localStore.setKeyValueForUnitTestsOnly(KEY, EXPECTED_VALUE);
 
         // do the CAS
-        final long newCommandIndex = 71;
-        KeyValue keyValue = localStore.compareAndSet(newCommandIndex, KEY, EXPECTED_VALUE, NEW_VALUE);
+        final long newIndex = 71;
+        KeyValue keyValue = localStore.compareAndSet(newIndex, KEY, EXPECTED_VALUE, NEW_VALUE);
         keyValue = checkNotNull(keyValue);
 
         assertThat(keyValue.getKey(), equalTo(KEY));
         assertThat(keyValue.getValue(), equalTo(NEW_VALUE));
 
         assertThatLocalStoreHasKeyValue(KEY, NEW_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
@@ -275,32 +279,32 @@ public final class LocalStoreTest {
         localStore.setKeyValueForUnitTestsOnly(KEY, EXPECTED_VALUE);
 
         // do the CAS
-        final long newCommandIndex = 23;
-        KeyValue keyValue = localStore.compareAndSet(newCommandIndex, KEY, EXPECTED_VALUE, null);
+        final long newIndex = 23;
+        KeyValue keyValue = localStore.compareAndSet(newIndex, KEY, EXPECTED_VALUE, null);
         assertThat(keyValue, nullValue());
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
     public void shouldThrowIllegalArgumentExceptionIfBothExpectedValueAndNewValueAreNull() throws Exception {
-        // set the lastAppliedCommandIndex to some value
-        final long preCASLastAppliedCommandIndex = 276;
-        localStore.setLastAppliedCommandIndexForUnitTestsOnly(preCASLastAppliedCommandIndex);
+        // set the lastAppliedIndex to some value
+        final long preCASLastAppliedIndex = 276;
+        localStore.setLastAppliedIndexForUnitTestsOnly(preCASLastAppliedIndex);
 
         // do the cas
-        final long casCommandCommandIndex = preCASLastAppliedCommandIndex + 1;
+        final long casCommandIndex = preCASLastAppliedIndex + 1;
         Exception casException = null;
         try {
-            localStore.compareAndSet(casCommandCommandIndex, KEY, null, null);
+            localStore.compareAndSet(casCommandIndex, KEY, null, null);
         } catch (IllegalArgumentException e) {
             casException = e;
         }
 
         // neither the value nor the command index should have been updated
         assertThat(casException, notNullValue());
-        assertThatLastAppliedCommandIndexHasValue(preCASLastAppliedCommandIndex);
+        assertThatLastAppliedIndexHasValue(preCASLastAppliedIndex);
     }
 
     @Test
@@ -309,10 +313,10 @@ public final class LocalStoreTest {
         localStore.setKeyValueForUnitTestsOnly(KEY, EXPECTED_VALUE);
 
         // do the CAS
-        final long newCommandIndex = 77;
+        final long newIndex = 77;
         KayVeeException casException = null;
         try {
-            localStore.compareAndSet(newCommandIndex, KEY, null, NEW_VALUE);
+            localStore.compareAndSet(newIndex, KEY, null, NEW_VALUE);
         } catch (KayVeeException e) {
             casException = e;
         }
@@ -322,7 +326,7 @@ public final class LocalStoreTest {
         assertThat(((KeyAlreadyExistsException) casException).getKey(), equalTo(KEY));
 
         assertThatLocalStoreHasKeyValue(KEY, EXPECTED_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
@@ -331,11 +335,11 @@ public final class LocalStoreTest {
         localStore.setKeyValueForUnitTestsOnly(KEY, EXPECTED_VALUE);
 
         // do the CAS
-        final long newCommandIndex = 71129837;
+        final long newIndex = 71129837;
         final String mismatchedExpectedValue = "lamport@ibm";
         KayVeeException casException = null;
         try {
-            localStore.compareAndSet(newCommandIndex, KEY, mismatchedExpectedValue, NEW_VALUE);
+            localStore.compareAndSet(newIndex, KEY, mismatchedExpectedValue, NEW_VALUE);
         } catch (KayVeeException e) {
             casException = e;
         }
@@ -347,15 +351,15 @@ public final class LocalStoreTest {
         assertThat(valueMismatchException.getExistingValue(), equalTo(EXPECTED_VALUE));
 
         assertThatLocalStoreHasKeyValue(KEY, EXPECTED_VALUE);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
     public void shouldThrowKeyNotFoundExceptionIfExpectedValueIsNotNullButKeyDoesNotExist() throws Exception {
-        final long newCommandIndex = 372;
+        final long newIndex = 372;
         KayVeeException casException = null;
         try {
-            localStore.compareAndSet(newCommandIndex, KEY, EXPECTED_VALUE, NEW_VALUE);
+            localStore.compareAndSet(newIndex, KEY, EXPECTED_VALUE, NEW_VALUE);
         } catch (KayVeeException e) {
             casException = e;
         }
@@ -365,7 +369,7 @@ public final class LocalStoreTest {
         assertThat(keyNotFoundException.getKey(), equalTo(KEY));
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
@@ -374,24 +378,70 @@ public final class LocalStoreTest {
         localStore.set(1, KEY, EXPECTED_VALUE);
 
         // delete it
-        final long newCommandIndex = 37;
-        localStore.delete(newCommandIndex, KEY);
+        final long newIndex = 37;
+        localStore.delete(newIndex, KEY);
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
     @Test
     public void shouldNoopIfDeleteCalledForKeyAndItDoesNotExist() throws Exception {
-        final long newCommandIndex = 37;
-        localStore.delete(newCommandIndex, KEY);
+        final long newIndex = 37;
+        localStore.delete(newIndex, KEY);
 
         assertThatLocalStoreHasKeyValue(KEY, null);
-        assertThatLastAppliedCommandIndexHasValue(newCommandIndex);
+        assertThatLastAppliedIndexHasValue(newIndex);
     }
 
-    private void assertThatLastAppliedCommandIndexHasValue(final long expectedLastAppliedCommandIndex) {
-        assertThat(localStore.getLastAppliedCommandIndex(), equalTo(expectedLastAppliedCommandIndex));
+    @Test
+    public void shouldSerializeKeyValuesToAndDeserializeKeyValuesFromStream() throws IOException {
+        // set the original command index
+        long originalIndex = 17;
+        localStore.setLastAppliedIndexForUnitTestsOnly(originalIndex);
+
+        // store all the initial key=>value pairs
+        KeyValue[] keyValues = new KeyValue[] {
+                new KeyValue("1", "ONE"),
+                new KeyValue("2", "TWO"),
+                new KeyValue("3", "THREE"),
+                new KeyValue("4", "FOUR")
+        };
+
+        for (KeyValue keyValue : keyValues) {
+            localStore.setKeyValueForUnitTestsOnly(keyValue.getKey(), keyValue.getValue());
+        }
+
+        // serialize
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        long index = localStore.dumpSnapshotTo(out);
+        assertThat(index, equalTo(originalIndex));
+
+        // now, change the command index and add another key=>value pair (i.e. change localStore state)
+        localStore.setLastAppliedIndexForUnitTestsOnly(18);
+        assertThat(localStore.getLastAppliedIndex(), equalTo(18L));
+        localStore.setKeyValueForUnitTestsOnly("5", "FIVE");
+
+        // let's read the serialized data
+        localStore.loadSnapshotFrom(index, new ByteArrayInputStream(out.toByteArray()));
+
+        // check that the final state is equal to the initial state
+        assertThat(localStore.getLastAppliedIndex(), equalTo(originalIndex));
+        assertThat(localStore.getAllForUnitTestsOnly(), containsInAnyOrder(keyValues));
+    }
+
+    @Test
+    public void shouldSerializeEmptyStateToAndFromStream() throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        long index = localStore.dumpSnapshotTo(out);
+        assertThat(index, equalTo(0L));
+
+        localStore.loadSnapshotFrom(index, new ByteArrayInputStream(out.toByteArray()));
+        assertThat(localStore.getAllForUnitTestsOnly(), Matchers.<KeyValue>iterableWithSize(0));
+    }
+
+    private void assertThatLastAppliedIndexHasValue(final long expectedLastAppliedIndex) {
+        assertThat(localStore.getLastAppliedIndex(), equalTo(expectedLastAppliedIndex));
     }
 
     private void assertThatLocalStoreHasKeyValue(final String key, @Nullable final String value) {

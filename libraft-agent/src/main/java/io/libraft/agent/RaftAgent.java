@@ -34,20 +34,24 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import io.libraft.Command;
-import io.libraft.CommittedCommand;
+import io.libraft.Committed;
 import io.libraft.NotLeaderException;
 import io.libraft.Raft;
 import io.libraft.RaftListener;
+import io.libraft.SnapshotRequest;
 import io.libraft.agent.configuration.RaftClusterConfiguration;
 import io.libraft.agent.configuration.RaftConfiguration;
 import io.libraft.agent.configuration.RaftConfigurationLoader;
 import io.libraft.agent.configuration.RaftDatabaseConfiguration;
+import io.libraft.agent.configuration.RaftSnapshotsConfiguration;
 import io.libraft.agent.persistence.JDBCLog;
 import io.libraft.agent.persistence.JDBCStore;
+import io.libraft.agent.snapshots.OnDiskSnapshotsStore;
 import io.libraft.agent.protocol.RaftRPC;
 import io.libraft.agent.rpc.RaftNetworkClient;
 import io.libraft.algorithm.RaftAlgorithm;
 import io.libraft.algorithm.StorageException;
+import org.apache.tomcat.jdbc.pool.DataSource;
 import org.jboss.netty.channel.socket.ClientSocketChannelFactory;
 import org.jboss.netty.channel.socket.ServerSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioClientBossPool;
@@ -57,11 +61,13 @@ import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioWorker;
 import org.jboss.netty.channel.socket.nio.NioWorkerPool;
 import org.jboss.netty.channel.socket.nio.ShareableWorkerPool;
+import org.skife.jdbi.v2.DBI;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Random;
 import java.util.Set;
@@ -158,6 +164,7 @@ public class RaftAgent implements Raft {
     private final RaftAlgorithm raftAlgorithm;
     private final JDBCStore jdbcStore;
     private final JDBCLog jdbcLog;
+    private final OnDiskSnapshotsStore snapshotStore;
     private final WrappedTimer timer;
 
     private ListeningExecutorService nonIoExecutorService;
@@ -177,8 +184,35 @@ public class RaftAgent implements Raft {
         JacksonBasedCommandSerializer commandSerializer = new JacksonBasedCommandSerializer(mapper);
         JacksonBasedCommandDeserializer commandDeserializer = new JacksonBasedCommandDeserializer(mapper);
 
-        // database setup
+        RaftSnapshotsConfiguration snapshotsConfiguration = configuration.getRaftSnapshotsConfiguration();
+
+        // TODO (AG): use this datasource and dbi across store, log, etc.
+        // raft database setup
         RaftDatabaseConfiguration raftDatabaseConfiguration = configuration.getRaftDatabaseConfiguration();
+        DataSource dataSource = new DataSource();
+        dataSource.setName("raft-db");
+        dataSource.setDriverClassName(raftDatabaseConfiguration.getDriverClass());
+        dataSource.setUrl(raftDatabaseConfiguration.getUrl());
+        dataSource.setInitialSize(3);
+        dataSource.setMaxActive(3);
+        dataSource.setMinIdle(dataSource.getMaxActive());
+        dataSource.setMaxIdle(dataSource.getMaxActive());
+        dataSource.setLogAbandoned(true);
+        if (raftDatabaseConfiguration.getUser() != null) {
+            dataSource.setUsername(raftDatabaseConfiguration.getUser());
+        }
+        if (raftDatabaseConfiguration.getPassword() != null) {
+            dataSource.setPassword(raftDatabaseConfiguration.getPassword());
+        }
+
+        try {
+            dataSource.createPool();
+        } catch (SQLException e) {
+            throw new IllegalArgumentException("fail create pool", e); // FIXME (AG): this is hugely bogus
+        }
+
+        DBI dbi = new DBI(dataSource);
+
         try {
             Class.forName(raftDatabaseConfiguration.getDriverClass());
         } catch (ClassNotFoundException e) {
@@ -186,6 +220,7 @@ public class RaftAgent implements Raft {
         }
         jdbcStore = new JDBCStore(raftDatabaseConfiguration.getUrl(), raftDatabaseConfiguration.getUser(), raftDatabaseConfiguration.getPassword());
         jdbcLog = new JDBCLog(raftDatabaseConfiguration.getUrl(), raftDatabaseConfiguration.getUser(), raftDatabaseConfiguration.getPassword(), commandSerializer, commandDeserializer);
+        snapshotStore = new OnDiskSnapshotsStore(dbi, snapshotsConfiguration.getSnapshotsDirectory());
 
         // network and algorithm setup
         timer = new WrappedTimer();
@@ -209,10 +244,14 @@ public class RaftAgent implements Raft {
                 raftNetworkClient,
                 jdbcStore,
                 jdbcLog,
+                snapshotStore,
                 raftListener,
                 raftClusterConfiguration.getSelf(),
                 getMemberIds(cluster),
-                configuration.getRPCTimeout(), configuration.getMinElectionTimeout(),
+                snapshotsConfiguration.getMinEntriesToSnapshot(),
+                snapshotsConfiguration.getSnapshotCheckInterval(),
+                configuration.getRPCTimeout(),
+                configuration.getMinElectionTimeout(),
                 configuration.getAdditionalElectionTimeoutRange(),
                 configuration.getHeartbeatInterval(),
                 configuration.getTimeUnit());
@@ -303,8 +342,10 @@ public class RaftAgent implements Raft {
         checkState(!initialized);
         checkState(setupConversion);
 
+        // FIXME (AG): have to initialize DBI
         jdbcLog.initialize();
         jdbcStore.initialize();
+        snapshotStore.initialize();
 
         nonIoExecutorService = MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
         ioExecutorService = Executors.newCachedThreadPool();
@@ -388,8 +429,10 @@ public class RaftAgent implements Raft {
 
         timer.stop();
 
+        snapshotStore.teardown();
         jdbcLog.teardown();
         jdbcStore.teardown();
+        // dbi.teardown(); FIXME (AG): have to teardown DBI
 
         running = false;
         initialized = false;
@@ -398,14 +441,25 @@ public class RaftAgent implements Raft {
     /**
      * {@inheritDoc}
      *
+     * @throws IllegalStateException if this method is called when {@code RaftAgent} is not running
+     */
+    @Override
+    public void snapshotCreatedFor(SnapshotRequest snapshotRequest) {
+        checkState(running); // implies conversion setup and initialization happened
+        raftAlgorithm.snapshotCreatedFor(snapshotRequest);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
      * @throws IllegalStateException if this method is called before {@code RaftAgent} is initialized
      */
     @Override
-    public @Nullable CommittedCommand getNextCommittedCommand(long indexToSearchFrom) {
+    public @Nullable Committed getNextCommitted(long indexToSearchFrom) {
         checkState(setupConversion);
         checkState(initialized);
 
-        return raftAlgorithm.getNextCommittedCommand(indexToSearchFrom);
+        return raftAlgorithm.getNextCommitted(indexToSearchFrom);
     }
 
     /**

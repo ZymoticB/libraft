@@ -29,6 +29,7 @@
 package io.libraft;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.libraft.algorithm.StorageException;
 
 import javax.annotation.Nullable;
 
@@ -36,6 +37,13 @@ import javax.annotation.Nullable;
  * Interface through which a client interacts with the Raft cluster.
  */
 public interface Raft {
+
+    /**
+     * Indicate that a snapshot was created for a previously generated {@code snapshotRequest}.
+     *
+     * @param snapshotRequest an instance of {@code SnapshotRequest} for which the snapshot was created
+     */
+    void snapshotCreatedFor(SnapshotRequest snapshotRequest) throws StorageException;
 
     /**
      * Get the <strong>next</strong> committed {@link Command} with a log index
@@ -49,7 +57,7 @@ public interface Raft {
      *         Raft log contains a committed command <strong>after</strong> {@code indexToSearchFrom}.
      *         {@code null} otherwise
      */
-     @Nullable CommittedCommand getNextCommittedCommand(long indexToSearchFrom);
+    @Nullable Committed getNextCommitted(long indexToSearchFrom) throws StorageException;
 
     /**
      * Submit an object to be replicated to the cluster.

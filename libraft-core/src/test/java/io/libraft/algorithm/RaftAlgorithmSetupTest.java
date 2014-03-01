@@ -34,13 +34,13 @@ import io.libraft.testlib.TestLoggingRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Random;
 import java.util.Set;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public final class RaftAlgorithmSetupTest {
@@ -50,11 +50,12 @@ public final class RaftAlgorithmSetupTest {
     private static final String SELF = "0";
 
     private final Random random = new Random();
-    private final Timer timer = Mockito.mock(Timer.class);
-    private final RPCSender sender = Mockito.mock(RPCSender.class);
-    private final Store store = Mockito.mock(Store.class);
-    private final Log log = Mockito.mock(Log.class);
-    private final RaftListener raftListener = Mockito.mock(RaftListener.class);
+    private final Timer timer = mock(Timer.class);
+    private final RPCSender sender = mock(RPCSender.class);
+    private final Store store = mock(Store.class);
+    private final Log log = mock(Log.class);
+    private final SnapshotsStore snapshotsStore = mock(SnapshotsStore.class);
+    private final RaftListener raftListener = mock(RaftListener.class);
 
     @Rule
     public final ExpectedException expectedException = ExpectedException.none();
@@ -65,25 +66,25 @@ public final class RaftAlgorithmSetupTest {
     @Test(expected = IllegalArgumentException.class)
     public void shouldNotAcceptClustersSmallerThanThree() {
         Set<String> cluster = Sets.newHashSet("1");
-        new RaftAlgorithm(random, timer, sender, store, log, raftListener, SELF, cluster);
+        new RaftAlgorithm(random, timer, sender, store, log, snapshotsStore, raftListener, SELF, cluster);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldNotAcceptClustersGreaterThanSeven() {
         Set<String> cluster = Sets.newHashSet(SELF, "1", "2", "3", "4", "5", "6", "7");
-        new RaftAlgorithm(random, timer, sender, store, log, raftListener, SELF, cluster);
+        new RaftAlgorithm(random, timer, sender, store, log, snapshotsStore, raftListener, SELF, cluster);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldNotAllowServersWithDuplicateIds() {
         Set<String> cluster = Sets.newHashSet(SELF, SELF, "2");
-        new RaftAlgorithm(random, timer, sender, store, log, raftListener, SELF, cluster);
+        new RaftAlgorithm(random, timer, sender, store, log, snapshotsStore, raftListener, SELF, cluster);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldNotAllowAClusterWithoutTheLocalServer() {
         Set<String> cluster = Sets.newHashSet("1", "2", "3");
-        new RaftAlgorithm(random, timer, sender, store, log, raftListener, SELF, cluster);
+        new RaftAlgorithm(random, timer, sender, store, log, snapshotsStore, raftListener, SELF, cluster);
     }
 
     @Test
@@ -93,7 +94,7 @@ public final class RaftAlgorithmSetupTest {
 
     private RaftAlgorithm createValidRaftAlgorithmInstance() {
         Set<String> cluster = Sets.newHashSet(SELF, "1", "2");
-        return new RaftAlgorithm(random, timer, sender, store, log, raftListener, SELF, cluster);
+        return new RaftAlgorithm(random, timer, sender, store, log, snapshotsStore, raftListener, SELF, cluster);
     }
 
     @Test
@@ -143,4 +144,7 @@ public final class RaftAlgorithmSetupTest {
         expectedException.expect(IllegalStateException.class);
         algorithm.start();
     }
+
+    // FIXME (AG): ensure that there are no gaps between log index and snapshot!
+    // FIXME (AG): add more initialization tests
 }

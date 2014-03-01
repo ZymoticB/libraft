@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
+@SuppressWarnings("unused")
 final class UnitTestTimer implements Timer {
 
     private enum TaskState {
@@ -89,9 +90,6 @@ final class UnitTestTimer implements Timer {
 
     private long tick = 0;
 
-    UnitTestTimer() {
-    }
-
     @Override
     public TimeoutHandle newTimeout(TimeoutTask task, long relativeTimeout, TimeUnit timeUnit) {
         checkArgument(relativeTimeout >= 0, "negative timeout:%s", relativeTimeout);
@@ -110,6 +108,13 @@ final class UnitTestTimer implements Timer {
 
     long getTick() {
         return tick;
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    long getTickForTask(TimeoutHandle handle) {
+        checkArgument(handle instanceof TaskWrapper, "unsupported handle type:%s", handle.getClass().getSimpleName());
+        TaskWrapper wrapper = (TaskWrapper) handle;
+        return wrapper.executionTime;
     }
 
     /**
@@ -185,5 +190,13 @@ final class UnitTestTimer implements Timer {
         tick = finalTick;
 
         return ranAtLeastOneTask;
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    boolean fastForwardTillTaskExecutes(TimeoutHandle handle) {
+        checkArgument(handle instanceof TaskWrapper, "unsupported handle type:%s", handle.getClass().getSimpleName());
+
+        TaskWrapper wrapper = (TaskWrapper) handle;
+        return fastForward(wrapper.executionTime - tick);
     }
 }

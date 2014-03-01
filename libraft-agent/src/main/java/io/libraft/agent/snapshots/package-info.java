@@ -26,42 +26,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.libraft;
-
-import javax.annotation.Nullable;
-
 /**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
+ * JDBC implementations of {@link io.libraft.algorithm.Log} and {@link io.libraft.algorithm.Store}.
  */
-public interface RaftListener {
+@ParametersAreNonnullByDefault
+package io.libraft.agent.snapshots;
 
-    /**
-     * Indicates that a leadership change has occurred.
-     *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
-     */
-    void onLeadershipChange(@Nullable String leader);
-
-    void createSnapshot(SnapshotRequest snapshotRequest);
-
-    void applySnapshot(Snapshot snapshot);
-
-    /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
-     *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
-     */
-    void applyCommand(CommittedCommand committedCommand);
-}
+import javax.annotation.ParametersAreNonnullByDefault;

@@ -26,42 +26,33 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.libraft;
+package io.libraft.algorithm;
+
+import io.libraft.Snapshot;
+import io.libraft.SnapshotRequest;
 
 import javax.annotation.Nullable;
 
-/**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
- */
-public interface RaftListener {
+public interface SnapshotsStore {
 
-    /**
-     * Indicates that a leadership change has occurred.
-     *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
-     */
-    void onLeadershipChange(@Nullable String leader);
+    interface ExtendedSnapshotRequest extends SnapshotRequest {
 
-    void createSnapshot(SnapshotRequest snapshotRequest);
+        void setTerm(long term);
+    }
 
-    void applySnapshot(Snapshot snapshot);
+    interface ExtendedSnapshot extends Snapshot {
 
-    /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
-     *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
-     */
-    void applyCommand(CommittedCommand committedCommand);
+        /**
+         * Get the term of the last committed log entry contained in the snapshot.
+         *
+         * @return term >= 0 in the Raft log of last committed entry contained in the snapshot
+         */
+        long getTerm();
+    }
+
+    ExtendedSnapshotRequest createSnapshotRequest() throws StorageException;
+
+    void addSnapshot(ExtendedSnapshotRequest snapshotRequest) throws StorageException;
+
+    @Nullable ExtendedSnapshot getLatestSnapshot() throws StorageException;
 }

@@ -28,40 +28,41 @@
 
 package io.libraft;
 
-import javax.annotation.Nullable;
-
 /**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
+ * Implemented by a class that contains state committed to the Raft cluster.
+ * <p/>
+ * A {@code Committed} can be <strong>one of</strong> these two types:
  * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
+ *     <li>{@code LOGENTRY}: an individual entry in the Raft cluster log.</li>
+ *     <li>{@code SNAPSHOT}: a snapshot representing the aggregate committed state
+ *         of the Raft cluster log at a certain log index.</li>
  * </ul>
+ * It is the responsibility of implementing classes to define which type
+ * they are and provide methods for the caller to load type-specific data.
  */
-public interface RaftListener {
+public interface Committed {
 
     /**
-     * Indicates that a leadership change has occurred.
-     *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
+     * The type of this committed state.
      */
-    void onLeadershipChange(@Nullable String leader);
+    enum Type {
 
-    void createSnapshot(SnapshotRequest snapshotRequest);
+        /**
+         * An individual entry in the Raft cluster log.
+         */
+        LOGENTRY,
 
-    void applySnapshot(Snapshot snapshot);
+        /**
+         * A snapshot representing the aggregate committed state
+         * of the Raft cluster log at a certain log index.
+         */
+        SNAPSHOT,
+    }
 
     /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
+     * Get the {@code Type} of this committed state.
      *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
+     * @return the type of this committed state
      */
-    void applyCommand(CommittedCommand committedCommand);
+    Type getType();
 }

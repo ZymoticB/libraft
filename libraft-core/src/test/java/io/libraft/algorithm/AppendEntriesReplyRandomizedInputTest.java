@@ -147,6 +147,7 @@ public final class AppendEntriesReplyRandomizedInputTest {
     private final StoringSender sender;
     private final Store store;
     private final Log log;
+    private final SnapshotsStore snapshotsStore;
     private final RaftListener listener;
 
     private RaftAlgorithm algorithm;
@@ -173,6 +174,7 @@ public final class AppendEntriesReplyRandomizedInputTest {
         sender = new StoringSender();
         store = new InMemoryStore();
         log = new InMemoryLog();
+        snapshotsStore = mock(SnapshotsStore.class);
         listener = mock(RaftListener.class);
     }
 
@@ -192,7 +194,7 @@ public final class AppendEntriesReplyRandomizedInputTest {
         }
 
         // create and start the algorithm instance
-        algorithm = new RaftAlgorithm(raftAlgorithmRandom, timer, sender, store, log, listener, SELF, ImmutableSet.copyOf(CLUSTER));
+        algorithm = new RaftAlgorithm(raftAlgorithmRandom, timer, sender, store, log, snapshotsStore, listener, SELF, ImmutableSet.copyOf(CLUSTER));
         algorithm.initialize();
         algorithm.start();
 

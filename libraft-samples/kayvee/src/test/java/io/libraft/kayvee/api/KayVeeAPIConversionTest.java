@@ -30,9 +30,13 @@ package io.libraft.kayvee.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Resources;
+import io.libraft.kayvee.TestLoggingRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -47,6 +51,8 @@ import static org.hamcrest.Matchers.equalTo;
 
 @RunWith(Parameterized.class)
 public final class KayVeeAPIConversionTest {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(KayVeeAPIConversionTest.class);
 
     @Parameterized.Parameters
     public static Collection<Object[]> parameters() {
@@ -65,6 +71,9 @@ public final class KayVeeAPIConversionTest {
     private final boolean shouldHasExpectedValueBeenSet;
     private final @Nullable String newValue;
     private final boolean shouldHasNewValueBeenSet;
+
+    @Rule
+    public final TestLoggingRule loggingRule = new TestLoggingRule(LOGGER);
 
     public KayVeeAPIConversionTest(
             String resourceFilename,

@@ -26,42 +26,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.libraft;
+package io.libraft.algorithm;
 
-import javax.annotation.Nullable;
+import com.google.common.base.Charsets;
 
-/**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
- */
-public interface RaftListener {
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
-    /**
-     * Indicates that a leadership change has occurred.
-     *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
-     */
-    void onLeadershipChange(@Nullable String leader);
+final class UnitTestExtendedSnapshot implements SnapshotsStore.ExtendedSnapshot {
 
-    void createSnapshot(SnapshotRequest snapshotRequest);
+    public final String TEST_DATA = "TEST_DATA";
 
-    void applySnapshot(Snapshot snapshot);
+    private long term;
+    private long index;
 
-    /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
-     *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
-     */
-    void applyCommand(CommittedCommand committedCommand);
+    UnitTestExtendedSnapshot(long term, long index) {
+        this.term = term;
+        this.index = index;
+    }
+
+    @Override
+    public Type getType() {
+        return Type.SNAPSHOT;
+    }
+
+    @Override
+    public long getTerm() {
+        return term;
+    }
+
+    @Override
+    public long getIndex() {
+        return index;
+    }
+
+    @Override
+    public InputStream getSnapshotInputStream() throws IOException {
+        return new ByteArrayInputStream(TEST_DATA.getBytes(Charsets.US_ASCII.name()));
+    }
 }

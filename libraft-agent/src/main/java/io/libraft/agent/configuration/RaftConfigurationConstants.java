@@ -26,42 +26,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package io.libraft;
+package io.libraft.agent.configuration;
 
-import javax.annotation.Nullable;
+import java.util.concurrent.TimeUnit;
 
-/**
- * Implemented by up-call code that wants to be notified of
- * important events in the Raft cluster. Listeners are notified when:
- * <ul>
- *     <li>The leader of the Raft cluster changes
- *         (i.e. the current leader loses leadership, or a new leader is chosen).</li>
- *     <li>A command is committed to the Raft cluster.</li>
- * </ul>
- */
-public interface RaftListener {
+abstract class RaftConfigurationConstants {
 
-    /**
-     * Indicates that a leadership change has occurred.
-     *
-     * @param leader unique id of the leader server. The client can use
-     *               {@link Raft#submitCommand(Command)} to submit a {@link Command} only
-     *               if {@code leader} is the unique id of the local
-     *               Raft server. If {@code leader} is {@code null } this means that the cluster
-     *               is experiencing interregnum or the local node does not know who
-     *               the current leader is.
-     */
-    void onLeadershipChange(@Nullable String leader);
+    static final TimeUnit DEFAULT_TIME_UNIT = TimeUnit.MILLISECONDS;
 
-    void createSnapshot(SnapshotRequest snapshotRequest);
+    static final int ONE_SECOND = 1000;
 
-    void applySnapshot(Snapshot snapshot);
+    static final long SIXTY_SECONDS = 60 * ONE_SECOND;
 
-    /**
-     * Indicates that {@code committedCommand} was committed to the Raft cluster.
-     *
-     * @param committedCommand {@code CommittedCommand} containing information about
-     *                         the {@code Command} that was committed to the Raft cluster
-     */
-    void applyCommand(CommittedCommand committedCommand);
+    static final long ONE_HOUR = 60 * SIXTY_SECONDS;
+
+    static final long TWELVE_HOURS = 12 * ONE_HOUR;
+
+    // to prevent instantiation of RaftConfigurationConstants
+    private RaftConfigurationConstants() { }
 }

@@ -54,6 +54,13 @@ public interface Log {
     @Nullable LogEntry get(long index) throws StorageException;
 
     /**
+     * Get the first {@code LogEntry} in the log.
+     *
+     * @return first {@code LogEntry} in the log if the log contains <strong>any</strong> entries or {@code null} otherwise
+     */
+    @Nullable LogEntry getFirst() throws StorageException;
+
+    /**
      * Get the last {@code LogEntry} in the log.
      *
      * @return last {@code LogEntry} in the log if the log contains <strong>any</strong> entries or {@code null} otherwise
@@ -80,4 +87,5 @@ public interface Log {
      * @param index index >=0 from which to remove {@code LogEntry} instances
      */
     void truncate(long index) throws StorageException;
+
 }
