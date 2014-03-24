@@ -672,6 +672,13 @@ public final class RaftAlgorithm implements RPCReceiver, Raft {
     synchronized Role getRole() {
         return role;
     }
+	
+	/**
+	 * Is the server currently the leader?
+	 */
+	public synchronized boolean isLeader() {
+		return role == Role.LEADER;
+	}
 
     /**
      * Get the unique id of the current leader server if known.
@@ -1355,6 +1362,7 @@ public final class RaftAlgorithm implements RPCReceiver, Raft {
                     log.put(entry);
                     nextToApplyLogIndex = nextToApplyLogIndex + 1;
                 }
+            	//scheduleElectionTimeout();
             }
 
             // TODO (AG): consider not sending responses for known duplicates
@@ -1449,6 +1457,9 @@ public final class RaftAlgorithm implements RPCReceiver, Raft {
                 becomeFollower(term, null);
                 return;
             }
+			if (role != Role.LEADER) {
+				return;
+			}
 
             checkState(role == Role.LEADER, "role:%s", role);
             checkState(self.equals(leader), "self:%s leader:%s", self, leader);
@@ -1500,6 +1511,17 @@ public final class RaftAlgorithm implements RPCReceiver, Raft {
             handleStorageException(e);
         }
     }
+
+	@Override
+	public synchronized void onSubmitCommand(String server, LogEntry clog) {
+		try {
+			//don't care about future
+			LogEntry.ClientEntry c = (LogEntry.ClientEntry) clog;
+			submitCommand(c.getCommand());
+		} catch (NotLeaderException ex) {
+			//whatever fuck it
+		}
+	}
 
     private long findPossibleCommitIndex(LogEntry lastLog, long originalCommitIndex) {
         ArrayList<Long> indices = Lists.newArrayListWithCapacity(serverData.size());
@@ -1606,6 +1628,28 @@ public final class RaftAlgorithm implements RPCReceiver, Raft {
 
         return commandFuture;
     }
+
+	public synchronized ListenableFuture<Void> submitCommandToLeader(Command command) {
+		String leader = getLeader();
+		SettableFuture<Void> f = SettableFuture.create();
+		if(leader == null) {
+			return f;
+		}
+		try {
+			//hack cause I don't understand JSON. make a log entry and use that serialization stuff
+			LogEntry.ClientEntry clog = new LogEntry.ClientEntry(1, 1, command);
+			sender.submitCommand(leader, store.getCurrentTerm(), clog);
+		} catch (RPCException ex) {
+			ex.printStackTrace();
+			//don't care
+			return f;
+		} catch (StorageException e) {
+			e.printStackTrace();
+			//don't care
+			return f;
+		}
+		return f;
+	}
 
     private void addClientEntry(long currentTerm, Command command, SettableFuture<Void> commandFuture) throws StorageException {
         LogEntry lastLog = checkNotNull(log.getLast());

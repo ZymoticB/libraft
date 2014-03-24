@@ -50,7 +50,8 @@ import javax.validation.constraints.Min;
         @JsonSubTypes.Type(value = RequestVote.class, name = "REQUEST_VOTE"),
         @JsonSubTypes.Type(value = RequestVoteReply.class, name = "REQUEST_VOTE_REPLY"),
         @JsonSubTypes.Type(value = AppendEntries.class, name = "APPEND_ENTRIES"),
-        @JsonSubTypes.Type(value = AppendEntriesReply.class, name = "APPEND_ENTRIES_REPLY")
+        @JsonSubTypes.Type(value = AppendEntriesReply.class, name = "APPEND_ENTRIES_REPLY"),
+		@JsonSubTypes.Type(value = SubmitCommand.class, name = "SUBMIT_COMMAND")
 })
 @JsonPropertyOrder({RaftRPC.TYPE, RaftRPC.SOURCE, RaftRPC.DESTINATION, RaftRPC.TERM})
 public abstract class RaftRPC {

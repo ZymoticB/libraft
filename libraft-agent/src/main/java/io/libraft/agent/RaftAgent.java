@@ -172,6 +172,8 @@ public class RaftAgent implements Raft {
     private boolean setupConversion;
     private boolean initialized;
 
+	private String self;
+
     private RaftAgent(RaftConfiguration configuration, RaftListener raftListener) {
         // default serializer and deserializer (based on Jackson)
         JacksonBasedCommandSerializer commandSerializer = new JacksonBasedCommandSerializer(mapper);
@@ -193,11 +195,12 @@ public class RaftAgent implements Raft {
         Random random = new Random();
         RaftClusterConfiguration raftClusterConfiguration = configuration.getRaftClusterConfiguration();
         Set<RaftMember> cluster = raftClusterConfiguration.getMembers();
+		self = raftClusterConfiguration.getSelf();
         raftNetworkClient = new RaftNetworkClient(
                 random,
                 timer,
                 mapper,
-                getSelfAsMember(raftClusterConfiguration.getSelf(), cluster),
+                getSelfAsMember(self, cluster),
                 cluster,
                 configuration.getConnectTimeout(),
                 configuration.getMinReconnectInterval(),
@@ -210,7 +213,7 @@ public class RaftAgent implements Raft {
                 jdbcStore,
                 jdbcLog,
                 raftListener,
-                raftClusterConfiguration.getSelf(),
+                self,
                 getMemberIds(cluster),
                 configuration.getRPCTimeout(), configuration.getMinElectionTimeout(),
                 configuration.getAdditionalElectionTimeoutRange(),
@@ -231,6 +234,10 @@ public class RaftAgent implements Raft {
 
         return selfMember;
     }
+
+	public String getSelf() {
+		return self;
+	}
 
     private Set<String> getMemberIds(Set<RaftMember> cluster) {
         Set<String> clusterIds = Sets.newHashSet();
@@ -426,6 +433,10 @@ public class RaftAgent implements Raft {
         // (raftAlgorithm methods themselves are serialized) and
         // holding yet another lock while calling into raftAlgorithm
 
-        return raftAlgorithm.submitCommand(command);
+		if(raftAlgorithm.isLeader()) {
+        	return raftAlgorithm.submitCommand(command);
+		} else {
+			return raftAlgorithm.submitCommandToLeader(command);
+		}
     }
 }

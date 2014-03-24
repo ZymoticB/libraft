@@ -37,6 +37,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
+import io.libraft.Command;
+
 class StoringSender implements RPCSender {
 
     //
@@ -152,6 +154,25 @@ class StoringSender implements RPCSender {
         }
     }
 
+    static final class SubmitCommand extends RPCCall {
+	
+		final LogEntry clog;
+
+        public SubmitCommand(String server, long term, LogEntry clog) {
+            super(server, term);
+			this.clog = clog;
+        }
+
+        @Override
+        public String toString() {
+            return Objects
+                    .toStringHelper(this)
+                    .add("server", server)
+                    .add("term", term)
+                    .add("client_log", clog)
+                    .toString();
+        }
+    }
     //
     // rpc
     //
@@ -210,4 +231,9 @@ class StoringSender implements RPCSender {
     public void appendEntriesReply(String server, long term, long prevLogIndex, long entryCount, boolean applied) throws RPCException {
         rpcCalls.add(new AppendEntriesReply(server, term, prevLogIndex, entryCount, applied));
     }
+
+	@Override
+	public void submitCommand(String server, long term, LogEntry clog) throws RPCException {
+		rpcCalls.add(new SubmitCommand(server, term, clog));
+	}
 }

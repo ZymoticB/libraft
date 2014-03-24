@@ -31,6 +31,8 @@ package io.libraft.algorithm;
 import javax.annotation.Nullable;
 import java.util.Collection;
 
+import io.libraft.Command;
+
 /**
  * Raft RPC message sending service. {@link RaftAlgorithm}
  * uses this component to send the following RPC messages to other servers
@@ -111,4 +113,13 @@ public interface RPCSender {
      * @see LogEntry
      */
     void appendEntriesReply(String server, long term, long prevLogIndex, long entryCount, boolean applied) throws RPCException;
+
+	/**
+	 * Send a SubmitCommand. Forward a command to the leader
+	 *
+	 * @param server unique id of the server to which the message should be sent
+	 * @param term election term in which this message was generated
+	 * @param clog The command that will be sent
+	 */
+	void submitCommand(String server, long term, LogEntry clog) throws RPCException;
 }

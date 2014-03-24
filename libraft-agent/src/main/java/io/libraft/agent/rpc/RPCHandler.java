@@ -33,6 +33,7 @@ import io.libraft.agent.protocol.AppendEntriesReply;
 import io.libraft.agent.protocol.RaftRPC;
 import io.libraft.agent.protocol.RequestVote;
 import io.libraft.agent.protocol.RequestVoteReply;
+import io.libraft.agent.protocol.SubmitCommand;
 import io.libraft.algorithm.RPCReceiver;
 import io.libraft.algorithm.RaftConstants;
 import org.jboss.netty.channel.ChannelHandler;
@@ -81,12 +82,12 @@ final class RPCHandler extends SimpleChannelUpstreamHandler {
         RaftRPC rpc = (RaftRPC) e.getMessage();
 
         if (!rpc.getDestination().equals(self)) {
-            LOGGER.warn("{}: discard {} from {} - wrong destination ({})", self, rpc, rpc.getSource(), rpc.getDestination());
+            LOGGER.error("{}: discard {} from {} - wrong destination ({})", self, rpc, rpc.getSource(), rpc.getDestination());
             return;
         }
 
         if (!cluster.contains(rpc.getSource())) {
-            LOGGER.warn("{}: discard {} from {} - not in cluster", self, rpc, rpc.getSource());
+            LOGGER.error("{}: discard {} from {} - not in cluster", self, rpc, rpc.getSource());
             return;
         }
 
@@ -117,7 +118,7 @@ final class RPCHandler extends SimpleChannelUpstreamHandler {
                         appendEntries.getPrevLogTerm(),
                         appendEntries.getEntries());
 
-            } else {
+            } else if (rpc instanceof AppendEntriesReply){
                 AppendEntriesReply appendEntriesReply = (AppendEntriesReply) rpc;
                 receiver.onAppendEntriesReply(
                         appendEntriesReply.getSource(),
@@ -125,7 +126,13 @@ final class RPCHandler extends SimpleChannelUpstreamHandler {
                         appendEntriesReply.getPrevLogIndex(),
                         appendEntriesReply.getEntryCount(),
                         appendEntriesReply.isApplied());
-            }
+            } else {
+				SubmitCommand submitCommand = (SubmitCommand) rpc;
+				receiver.onSubmitCommand(
+						submitCommand.getSource(),
+						submitCommand.getLog());
+			}
+
         } catch (Throwable t) {
             LOGGER.error("{}: uncaught exception processing rpc:{} from {}", self, rpc, rpc.getSource(), t);
             System.exit(RaftConstants.UNCAUGHT_THROWABLE_EXIT_CODE);

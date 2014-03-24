@@ -37,11 +37,13 @@ import io.libraft.agent.protocol.AppendEntriesReply;
 import io.libraft.agent.protocol.RaftRPC;
 import io.libraft.agent.protocol.RequestVote;
 import io.libraft.agent.protocol.RequestVoteReply;
+import io.libraft.agent.protocol.SubmitCommand;
 import io.libraft.algorithm.LogEntry;
 import io.libraft.algorithm.RPCException;
 import io.libraft.algorithm.RPCReceiver;
 import io.libraft.algorithm.RPCSender;
 import io.libraft.algorithm.Timer;
+import io.libraft.Command;
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
@@ -464,4 +466,9 @@ public final class RaftNetworkClient implements RPCSender {
     public void appendEntriesReply(String server, long term, long prevLogIndex, long entryCount, boolean applied) throws RPCException {
         write(server, new AppendEntriesReply(self.getId(), server, term, prevLogIndex, entryCount, applied));
     }
+
+	@Override
+	public void submitCommand(String server, long term, LogEntry clog) throws RPCException{
+		write(server, new SubmitCommand(self.getId(), server, term, clog));
+	}
 }

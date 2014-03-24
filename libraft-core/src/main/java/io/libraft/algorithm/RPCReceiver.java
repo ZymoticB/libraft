@@ -30,6 +30,7 @@ package io.libraft.algorithm;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
+import io.libraft.Command;
 
 /**
  * Incoming Raft RPC message notification service. This is the
@@ -108,4 +109,12 @@ public interface RPCReceiver {
      *                to its log. false otherwise
      */
     void onAppendEntriesReply(String server, long term, long prevLogIndex, long entryCount, boolean applied);
+
+	/**
+	 * Indicates that a SubmitCommand was received. This means that a follower has forwarded a request to the leader.
+	 *
+	 * @param server unique id of the server that sent this message.
+	 * @param clog the command that the origin server wishes to be executed on cluster
+	 */
+	void onSubmitCommand(String server, LogEntry clog);
 }
